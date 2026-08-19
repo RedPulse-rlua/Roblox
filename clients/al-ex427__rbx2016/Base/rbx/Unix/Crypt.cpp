@@ -1,5 +1,5 @@
 #include "rbx/Crypt.h"
-#include "rbxFormat.h"
+#include "RbxFormat.h"
 #include <boost/scoped_array.hpp>
 
 #include <iostream>
