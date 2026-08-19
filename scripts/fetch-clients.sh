@@ -18,6 +18,8 @@ for repo in "${REPOS[@]}"; do
   mkdir -p "$CLIENT_DIR/$name"
   if curl -fsSL "https://codeload.github.com/$repo/tar.gz/refs/heads/main" \
       | tar -xz --strip-components=1 -C "$CLIENT_DIR/$name"; then
+    # Strip nested .gitignore files so nothing is silently excluded from the monorepo
+    find "$CLIENT_DIR/$name" -name .gitignore -delete
     echo "OK: $repo -> clients/$name" >> "$CLIENT_DIR/audit.txt"
   else
     echo "FAILED: $repo" >> "$CLIENT_DIR/audit.txt"
