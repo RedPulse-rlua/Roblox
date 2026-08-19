@@ -46,7 +46,7 @@ jobs:
 
       - name: Build libroblox.so (armeabi-v7a, x86)
         run: |
-          SET="clients/al-ex427__rbx2016"
+          SET="$(pwd)/clients/al-ex427__rbx2016"
           NDK="$(pwd)/ndk/android-ndk-r17c"
           STL="$NDK/sources/cxx-stl"
           for abi in armeabi-v7a x86; do
