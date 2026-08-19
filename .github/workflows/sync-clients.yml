@@ -20,6 +20,17 @@ jobs:
       - name: Fetch all client sources
         run: bash scripts/fetch-clients.sh
 
+
+      - name: DIAG workspace
+        run: |
+          echo "ws_preproc_debug:"
+          ls -la clients/al-ex427__rbx2016/Contribs/boost_1_56_0/include/boost/preprocessor/debug/ 2>/dev/null || echo MISSING_IN_WS
+          echo "wc_clients:"
+          find clients/al-ex427__rbx2016 -type f | wc -l
+          echo "git_porcelain:"
+          git status --porcelain -- clients | wc -l
+          echo "audit:"
+          cat clients/audit.txt
       - name: Commit and push
         run: |
           git config user.name "GitHub Actions"
