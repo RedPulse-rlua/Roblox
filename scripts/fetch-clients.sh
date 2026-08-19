@@ -13,9 +13,11 @@ REPOS=(
 
 for repo in "${REPOS[@]}"; do
   name="${repo//\//__}"
-  echo "Fetching $repo ..."
-  if git clone --depth 1 --quiet "https://github.com/$repo.git" "$CLIENT_DIR/$name"; then
-    rm -rf "$CLIENT_DIR/$name/.git"
+  echo "Fetching $repo (tarball)..."
+  rm -rf "$CLIENT_DIR/$name"
+  mkdir -p "$CLIENT_DIR/$name"
+  if curl -fsSL "https://codeload.github.com/$repo/tar.gz/refs/heads/main" \
+      | tar -xz --strip-components=1 -C "$CLIENT_DIR/$name"; then
     echo "OK: $repo -> clients/$name" >> "$CLIENT_DIR/audit.txt"
   else
     echo "FAILED: $repo" >> "$CLIENT_DIR/audit.txt"
