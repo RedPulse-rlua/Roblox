@@ -1,0 +1,30 @@
+name: Sync Client Sources
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 0'
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Fetch all client sources
+        run: bash scripts/fetch-clients.sh
+
+      - name: Commit and push
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git add -A
+          git -c user.name="GitHub Actions" -c user.email="actions@github.com" commit -m "Sync client sources [skip ci]" --allow-empty
+          git push origin HEAD
