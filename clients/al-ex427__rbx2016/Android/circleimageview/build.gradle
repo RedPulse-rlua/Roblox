@@ -1,0 +1,26 @@
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'de.hdodenhof.circleimageview'
+    compileSdkVersion 28
+
+    defaultConfig {
+        minSdkVersion 15
+        targetSdkVersion 28
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    lint {
+        abortOnError false
+    }
+}
+
+dependencies {
+    compileOnly 'com.android.support:support-annotations:28.0.0'
+}

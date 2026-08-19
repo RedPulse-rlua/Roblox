@@ -1,0 +1,11 @@
+// Top-level build file for modern AGP 8.x
+// Repositories for plugins and dependencies are defined in settings.gradle via
+// pluginManagement and dependencyResolutionManagement.
+
+plugins {
+    id 'com.android.library' version '8.5.2' apply false
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.buildDir
+}

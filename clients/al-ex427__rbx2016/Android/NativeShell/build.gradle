@@ -1,0 +1,290 @@
+    plugins {
+    id 'com.android.application'
+}
+
+// Prefer support libs v28 on api15 configurations
+configurations.all { cfg ->
+    def n = cfg.name.toLowerCase()
+    if (n.contains('api15')) {
+        cfg.resolutionStrategy.force(
+                'com.android.support:appcompat-v7:28.0.0',
+                'com.android.support:support-v4:28.0.0',
+                'com.android.support:design:28.0.0',
+                'com.android.support:support-annotations:28.0.0'
+        )
+    }
+}
+
+def getVersionCode = { ->
+    def code = project.hasProperty('versionCode') ? versionCode.toInteger() : 100
+    return code
+}
+
+def getVersionName = { ->
+    def name = project.hasProperty('versionName') ? versionName : "2.99.99"
+    return name
+}
+
+def getReleaseNotes = { ->
+    def notes = project.hasProperty('betaDistributionReleaseNotes') ? betaDistributionReleaseNotes : ""
+    return notes
+}
+
+def getReleaseGroups = { ->
+    def groups = project.hasProperty('betaDistributionGroupAliases') ? betaDistributionGroupAliases : ""
+    return groups
+}
+
+// Repositories are defined at the root via dependencyResolutionManagement
+
+dependencies {
+    // Legacy API15-only build using support libraries v28
+    implementation 'com.android.support:appcompat-v7:28.0.0'
+    implementation 'com.android.support:design:28.0.0'
+    implementation 'com.android.support:multidex:1.0.3'
+
+    // Local circleimageview module (uses support annotations v28)
+    implementation project(':circleimageview')
+
+    // Explicitly declare local jars
+    def localJarsCommon = [
+        'Amazon-in-app-purchasing-2.0.0.jar',
+        'MobileAppTracker-3.3.2.jar',
+        'MobileAppTracker-javadoc-3.3.2.jar',
+        'fmod.jar',
+        'gigya-sdk-3.2.1.jar',
+        'ima-android-sdk-beta9.jar'
+    ]
+    implementation files(localJarsCommon.collect { "libs/${it}" })
+
+    // Unit tests
+    testImplementation 'junit:junit:4.13.2'
+
+    // Compile-time stubs so legacy code compiles but we don't package/dex them
+    compileOnly 'com.google.android.gms:play-services-analytics:16.0.8'
+    compileOnly 'com.google.android.gms:play-services-ads-identifier:16.0.0'
+    compileOnly 'com.google.android.gms:play-services-base:16.0.1'
+    compileOnly 'com.google.android.gms:play-services-basement:16.0.1'
+    compileOnly 'com.facebook.android:facebook-android-sdk:4.38.1'
+    compileOnly 'io.fabric.sdk.android:fabric:1.4.8'
+    compileOnly 'com.crashlytics.sdk.android:crashlytics:2.9.9'
+    compileOnly 'com.crashlytics.sdk.android:crashlytics-ndk:2.1.1'
+}
+
+android {
+    namespace 'com.roblox.client'
+    signingConfigs {
+        packageRelease {
+            keyAlias 'seriously_do_not_delete_this_file'
+            keyPassword 'Sa4e63uCh4$robloxAndroid$'
+            storeFile file('../robloxAndroidPK_DO_NOT_DELETE')
+            storePassword 'Sa4e63uCh4$robloxAndroid$'
+        }
+    }
+    // Legacy build path
+    compileSdkVersion 28
+    lint {
+        // Legacy api15: allow release to proceed despite resource matrix gaps and old targetSdk
+        abortOnError = false
+        checkReleaseBuilds = false
+        disable 'MissingDefaultResource','ExtraTranslation','ExpiredTargetSdkVersion'
+    }
+
+    useLibrary 'org.apache.http.legacy'
+
+    sourceSets {
+        main {
+            manifest.srcFile 'AndroidManifest.xml'
+            java.srcDirs = ['src']
+            resources.srcDirs = ['src']
+            aidl.srcDirs = ['src', 'src/main/aidl']
+            renderscript.srcDirs = ['src']
+            res.srcDirs = ['res']
+            assets.srcDirs = ['assets']
+
+            jni.srcDirs = []
+            // Package native libs from either legacy 'libs' or ndk output 'jniLibs'
+            jniLibs.srcDirs = ['libs', 'jniLibs']
+        }
+
+        // Organize test folders
+        androidTest{
+            setRoot('tests')
+            java.srcDirs = ['tests/androidTests/src']
+            res.srcDirs = ['tests/androidTests/res']
+        }
+
+        test {
+            setRoot('tests')
+            java.srcDirs = ['tests/unitTests/src']
+            res.srcDirs = ['tests/unitTests/res']
+        }
+
+        // Move the build types to build-types/<type>
+        // For instance, build-types/debug/java, build-types/debug/AndroidManifest.xml, ...
+        // This moves them out of them default location under src/<type>/... which would
+        // conflict with src/ being used by the main source set.
+        // Adding new build types or product flavors should be accompanied
+        // by a similar customization.
+        debug.setRoot('build-types/debug')
+        release.setRoot('build-types/release')
+    }
+
+    defaultConfig {
+        applicationId 'com.roblox2016.client'
+        versionCode getVersionCode()
+        versionName getVersionName()
+        minSdkVersion 15
+        targetSdkVersion 28
+        // Legacy runner (or omit)
+        testInstrumentationRunner 'android.test.InstrumentationTestRunner'
+        multiDexEnabled true
+        // BuildConfig flags used by legacy sources
+        buildConfigField 'boolean', 'USE_AMAZON_PURCHASING', 'false'
+    }
+
+    // Remove deprecated aaptOptions; vector drawables handled by support libs
+
+    // No forced resolutions needed with AndroidX
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.packageRelease
+        }
+    }
+    // Skip stripping native libs to avoid NDK requirement during packaging
+    packagingOptions {
+        doNotStrip "**/*.so"
+    }
+    splits {
+        abi {
+            enable true
+            universalApk true
+            reset()
+            // ABIs supported by legacy builds
+            include 'armeabi-v7a', 'x86'
+        }
+    }
+
+    // No flavors: single legacy variant only
+
+    // Generate BuildConfig for all variants
+    buildFeatures {
+        buildConfig true
+    }
+}
+
+// AGP 8: androidComponents is a top-level block
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def vName = variant.name
+        // Derive build type name ('debug' or 'release')
+        def btName = (variant.buildType != null ? variant.buildType : (vName.toLowerCase().contains('release') ? 'release' : 'debug'))
+        def btDir = (btName == 'release') ? 'release' : 'debug'
+        def taskName = "copyNativeLibsFor${vName.capitalize()}"
+
+        tasks.register(taskName) {
+            group = 'build'
+            description = "Copy libroblox and FMOD .so files into jniLibs for ${vName}"
+            doLast {
+                // Determine ABIs per flavor: api15 -> v7a + x86
+                def abisForVariant = ['armeabi-v7a','x86']
+                abisForVariant.each { abi ->
+                    // Destination inside app module
+                    File dstDir = file("${project.projectDir}/jniLibs/${abi}")
+                    dstDir.mkdirs()
+
+                    // Try multiple candidate locations for libroblox.so (legacy/varied layouts)
+                    def roboCandidates = [
+                            // Newer assumption (cmake or unified build)
+                            file("${rootProject.projectDir}/build/${btDir}/${abi}/libroblox.so"),
+                            file("${rootProject.projectDir}/build/${btDir}/libs/${abi}/libroblox.so"),
+                            // Under this module's build tree
+                            file("${project.projectDir}/build/${btDir}/libs/${abi}/libroblox.so"),
+                            // Legacy Android tree under repo
+                            file("${rootProject.projectDir}/Android/build/${btDir}/libs/${abi}/libroblox.so"),
+                            // Legacy flat libs folder committed to repo
+                            file("${project.projectDir}/libs/${abi}/libroblox.so"),
+                            // Older release folder structure used by scripts
+                            file("${rootProject.projectDir}/build/release/libs/${abi}/libroblox.so"),
+                            file("${project.projectDir}/build/release/libs/${abi}/libroblox.so")
+                    ]
+                    File robloxSo = roboCandidates.find { it != null && it.exists() }
+                    if (robloxSo) {
+                        copy { from robloxSo; into dstDir }
+                        logger.lifecycle("[native] Copied libroblox.so for ${abi} from ${robloxSo} -> ${dstDir}")
+                    } else {
+                        logger.lifecycle("[native] libroblox.so not found for ${abi}. Checked: ${roboCandidates}")
+                    }
+
+                    // FMOD from repo tree
+                    File fmodDir = file("${rootProject.projectDir}/../fmod/Android/${abi}")
+                    String fmodName = (btDir == 'release') ? 'libfmod.so' : 'libfmodL.so'
+                    File fmodSo = new File(fmodDir, fmodName)
+                    if (fmodSo.exists()) {
+                        copy { from fmodSo; into dstDir }
+                        logger.lifecycle("[native] Copied ${fmodName} for ${abi} -> ${dstDir}")
+                    } else {
+                        // Best-effort: copy any libfmod*.so if specific one missing
+                        def anyFmods = fmodDir.exists() ? fmodDir.listFiles(new FilenameFilter(){ boolean accept(File d,String n){ n.startsWith('libfmod') && n.endsWith('.so') } }) : null
+                        if (anyFmods && anyFmods.length > 0) {
+                            anyFmods.each { File f -> copy { from f; into dstDir } }
+                            logger.lifecycle("[native] Copied ${anyFmods.length} FMOD file(s) for ${abi} -> ${dstDir}")
+                        } else {
+                            logger.lifecycle("[native] FMOD .so not found for ${abi} under ${fmodDir}")
+                        }
+                    }
+                }
+            }
+        }
+
+        // Ensure copy runs before variant's preBuild task
+        def preTask = "pre${vName.capitalize()}Build"
+        tasks.matching { it.name == preTask }.configureEach { dependsOn tasks.named(taskName) }
+    }
+}
+// Cross-platform ndk-build Exec using ndk.dir (Android/local.properties) or ANDROID_NDK_HOME
+def ndkBuildPath(flavor = null) {
+    def props = new Properties()
+    def lp = rootProject.file('local.properties')
+    if (lp.exists()) {
+        lp.withInputStream { props.load(it) }
+    }
+    // Allow per-flavor override: ndk.dir.api15 / ndk.dir.api19
+    def key = flavor ? "ndk.dir.${flavor}" : null
+    def ndkDir = (key ? props.getProperty(key) : null) ?: props.getProperty('ndk.dir') ?: System.getenv('ANDROID_NDK_HOME')
+    if (ndkDir == null || ndkDir.trim().isEmpty()) return null
+    def exe = org.gradle.internal.os.OperatingSystem.current().isWindows() ? 'ndk-build.cmd' : 'ndk-build'
+    def candidate = new File(ndkDir, exe)
+    return candidate.exists() ? candidate.absolutePath : null
+}
+
+// Try to detect if required prebuilt native libs exist
+def hasPrebuiltRobloxSo() {
+    // Common candidate locations
+    def candidates = [
+        // Repo root build tree
+        rootProject.file('build/release/libs/armeabi-v7a/libroblox.so'),
+        // Under Android project build (if generated elsewhere)
+        project.file('build/release/libs/armeabi-v7a/libroblox.so'),
+        // Path referenced by Android.mk relative to jni (normalize from here)
+        project.file('jni/../../../../build/release/libs/armeabi-v7a/libroblox.so').canonicalFile
+    ]
+    return candidates.any { it != null && it.exists() }
+}
+
+// Flavor-specific ndk-build tasks
+tasks.register('runNDKBuildApi15', Exec) {
+    def ndk = ndkBuildPath('api15')
+    onlyIf { ndk != null && hasPrebuiltRobloxSo() }
+    doFirst {
+        if (ndk == null) logger.lifecycle('Skipping ndk-build (api15): NDK not found (set ndk.dir.api15 in local.properties)')
+        else if (!hasPrebuiltRobloxSo()) logger.lifecycle('Skipping ndk-build (api15): prebuilt libroblox.so not found')
+    }
+    if (ndk != null) {
+        // Force platform 15 when using older NDK suited for legacy devices
+        commandLine ndk, '-C', 'jni', 'NDK_APP_OUT=jniLibs', 'NDK_OUT=libsApi15', 'RELEASE=1', 'PATH_PREFIX=../', 'APP_PLATFORM=android-15'
+    }
+}
+
+// No flavor-specific JavaCompile hooks

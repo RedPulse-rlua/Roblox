@@ -1,0 +1,60 @@
+site_name: Roblox 2016 Src docs
+# Repository
+repo_name: alexs-stuff/roblox-2016-source-code
+repo_url: https://github.com/alexs-stuff/roblox-2016-source-code
+
+copyright: "Docs by al_ex427</br>Original project by yung.doom"
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  
+theme:
+  name: material
+  icon:
+    logo: simple/roblox
+  features:
+    - content.code.copy
+    - content.tabs
+    - content.tabs.link
+    - navigation.footer
+  font:
+    text: "Source Sans 3"
+    code: "Inconsolata"
+  palette: 
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/link
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: red
+      accent: red
+      toggle:
+        icon: material/toggle-switch
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: red
+      accent: red
+      toggle:
+        icon: material/toggle-switch-off
+        name: Switch to system preference
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/al-ex427
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/E8DnA6ZjJP
+nav:
+    - Home: index.md
+    - Building:
+      - Building Contribs: building_contribs.md
+      - Building Source: building.md
+    - Features: features.md

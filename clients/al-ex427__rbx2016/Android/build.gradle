@@ -1,0 +1,9 @@
+// Top-level Gradle build file using modern plugins DSL for AGP 8.x
+plugins {
+    id 'com.android.library' version '8.5.2' apply false
+    id 'com.android.application' version '8.5.2' apply false
+    id 'com.google.gms.google-services' version '4.4.2' apply false
+    id 'com.google.firebase.crashlytics' version '2.9.9' apply false
+}
+
+// No additional configuration is required here; modules define their own settings.
