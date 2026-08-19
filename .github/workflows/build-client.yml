@@ -19,14 +19,25 @@ jobs:
       - name: Install v140 toolset into VS2022
         shell: powershell
         run: |
-          & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add Microsoft.VisualStudio.Component.VC.v140.x86.x64 --quiet --norestart
-          Write-Host "v140 install exit: $LASTEXITCODE"
+          $args = @('modify','--installPath','C:\Program Files\Microsoft Visual Studio\2022\Enterprise','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--quiet','--norestart','--wait','--nocache')
+          $p = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList $args -Wait -PassThru -NoNewWindow
+          Write-Host "setup.exe exit: $($p.ExitCode), v140 dir exists: $(Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')"
+          if (-not (Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')) {
+            Write-Host "Falling back to VS2019 BuildTools bootstrapper"
+            Invoke-WebRequest -Uri "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile "$env:TEMP\vs_buildtools.exe" -UseBasicParsing
+            Start-Process "$env:TEMP\vs_buildtools.exe" -ArgumentList '--quiet','--wait','--norestart','--nocache','--add','Microsoft.VisualStudio.Workload.VCTools','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--includeRecommended' -Wait -PassThru -NoNewWindow
+            Write-Host "BT v140 dir exists: $(Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v140')"
+          }
 
       - name: Build RCCService (Release, Win32, v140)
         shell: powershell
         continue-on-error: true
         run: |
           $msbuild = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+          if (-not (Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')) {
+            $msbuild = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
+          }
+          Write-Host "Using MSBuild: $msbuild"
           $sln = "clients/al-ex427__rbx2016/Client_2016.sln"
           & $msbuild $sln /m:2 /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v140 /p:WindowsTargetPlatformVersion=10.0 /t:RCCService /v:minimal 2>&1 | Tee-Object -FilePath build_output.log
           Write-Host "RCCService build exit: $LASTEXITCODE"
