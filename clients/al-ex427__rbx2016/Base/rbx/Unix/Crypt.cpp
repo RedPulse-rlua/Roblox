@@ -126,10 +126,11 @@ namespace RBX
 	}
 		
 	//Crypt implementation with RSA security using SHA1 algorithm for signature verification.
-	void Crypt::verifySignatureBase64(std::string messageStr, std::string signatureStr)
+	bool Crypt::verifySignatureBase64(std::string messageStr, std::string signatureStr)
 	{
 		if (!verifyMessage((char*)messageStr.c_str(), (char*)signatureStr.c_str()))
 			throw std::runtime_error("");  // message hidden on purpose - prevent reverse engineering
+		return true;
 	}
 			
 } // namespace RBX
