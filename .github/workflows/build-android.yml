@@ -48,6 +48,26 @@ jobs:
           unzip -q ndk.zip -d ndk
           ls ndk
 
+      - name: Fix case-sensitive includes
+        run: |
+          cd "clients/al-ex427__rbx2016"
+          grep -rhoE '#include "[^"]+"' --include='*.cpp' --include='*.h' --include='*.cc' --include='*.c' . 2>/dev/null \
+            | sed -E 's/^#include "([^"]+)"$/\1/' | sort -u > /tmp/natinc.txt
+          echo "total includes: $(wc -l < /tmp/natinc.txt)"
+          while IFS= read -r rel; do
+            [ -n "$rel" ] || continue
+            [ -e "$rel" ] && continue
+            dir=$(dirname "$rel")
+            base=$(basename "$rel")
+            found=$(find "$dir" -maxdepth 1 -iname "$base" 2>/dev/null | head -1)
+            if [ -n "$found" ]; then
+              mkdir -p "$dir"
+              ln -s "$found" "$rel"
+              echo "LINKED $rel -> $found"
+            fi
+          done < /tmp/natinc.txt
+          echo "case-fix done"
+
       - name: Build libroblox.so (armeabi-v7a, x86)
         run: |
           SET="$(pwd)/clients/al-ex427__rbx2016"
