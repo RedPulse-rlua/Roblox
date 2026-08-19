@@ -6,6 +6,10 @@ on:
     branches: [main]
     paths: ['.github/workflows/build-android.yml']
 
+concurrency:
+  group: build-android
+  cancel-in-progress: false
+
 jobs:
   android:
     runs-on: ubuntu-latest
