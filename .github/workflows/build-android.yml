@@ -61,6 +61,8 @@ jobs:
               -DANDROID_ARM_NEON=OFF \
               -DRBX_STL_INCLUDE_DIRS="$STL/llvm-libc++/include;$STL/llvm-libc++abi/include;$STL/../../sources/android/support/include" \
               -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_C_FLAGS="-isystem $SET/Contribs/android/asm" \
+              -DCMAKE_CXX_FLAGS="-isystem $SET/Contribs/android/asm" \
               -DCONTRIB_PATH="$SET/Contribs"
             cmake --build "$SET/Android/build/release/$abi" -- -j$(nproc)
             ls -la "$SET/Android/build/release/$abi/libroblox.so"
