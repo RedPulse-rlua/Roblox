@@ -51,22 +51,27 @@ jobs:
       - name: Fix case-sensitive includes
         run: |
           cd "clients/al-ex427__rbx2016"
+          ROOTS=$(find . -maxdepth 4 -type d -name include 2>/dev/null)
+          echo "include roots: $(echo $ROOTS)"
           grep -rhoE '#include "[^"]+"' --include='*.cpp' --include='*.h' --include='*.cc' --include='*.c' . 2>/dev/null \
             | sed -E 's/^#include "([^"]+)"$/\1/' | sort -u > /tmp/natinc.txt
           echo "total includes: $(wc -l < /tmp/natinc.txt)"
+          LINKED=0
           while IFS= read -r rel; do
             [ -n "$rel" ] || continue
-            [ -e "$rel" ] && continue
-            dir=$(dirname "$rel")
-            base=$(basename "$rel")
-            found=$(find "$dir" -maxdepth 1 -iname "$base" 2>/dev/null | head -1)
-            if [ -n "$found" ]; then
-              mkdir -p "$dir"
-              ln -s "$found" "$rel"
-              echo "LINKED $rel -> $found"
-            fi
+            case "$rel" in /*|../*) continue;; esac
+            d=$(dirname "$rel"); b=$(basename "$rel")
+            for r in $ROOTS; do
+              [ -e "$r/$rel" ] && continue
+              found=$(find "$r/$d" -maxdepth 1 -iname "$b" 2>/dev/null | head -1)
+              if [ -n "$found" ]; then
+                ln -sf "$found" "$r/$rel"
+                LINKED=$((LINKED+1))
+                echo "LINKED $r/$rel -> $found"
+              fi
+            done
           done < /tmp/natinc.txt
-          echo "case-fix done"
+          echo "case-fix done, linked=$LINKED"
 
       - name: Build libroblox.so (armeabi-v7a, x86)
         run: |
