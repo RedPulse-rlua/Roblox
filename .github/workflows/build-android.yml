@@ -65,7 +65,7 @@ jobs:
               [ -e "$r/$rel" ] && continue
               found=$(find "$r/$d" -maxdepth 1 -iname "$b" 2>/dev/null | head -1)
               if [ -n "$found" ]; then
-                ln -sf "$found" "$r/$rel"
+                ln -sf "$PWD/$found" "$r/$rel"
                 LINKED=$((LINKED+1))
                 echo "LINKED $r/$rel -> $found"
               fi
