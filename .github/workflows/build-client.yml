@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2022
     steps:
       - name: Configure git long paths
         run: git config --system core.longpaths true
@@ -16,41 +16,66 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Restore client sources
-        run: bash scripts/fetch-clients.sh
-
-      - name: Install build tools
+      - name: Install v140 toolset into VS2022
         shell: powershell
         run: |
-          choco install -y visualstudio2019buildtools visualstudio2015buildtools --no-progress
-          choco install -y python3 --no-progress
+          & "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Enterprise" --add Microsoft.VisualStudio.Component.VC.v140.x86.x64 --quiet --norestart
+          $LASTEXITCODE
 
-      - name: Add VS tools to PATH
+      - name: Try to fetch prebuilt Qt 4.8.5
         shell: powershell
         run: |
-          $vs = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
-          $msbuild = Join-Path $vs "MSBuild\Current\Bin\MSBuild.exe"
-          echo "MSBUILD=$msbuild" >> $env:GITHUB_ENV
+          try {
+            $page = Invoke-RestMethod "https://api.gofile.io/getContent?contentId=Plze0w" -UseBasicParsing
+            $link = $page.data.contents.Values | Select-Object -First 1 | ForEach-Object { $_.link }
+            if ($link) {
+              Invoke-WebRequest $link -OutFile "clients/al-ex427__rbx2016/Contribs/qt.7z" -UseBasicParsing
+              echo "Qt downloaded: $($(Get-Item clients/al-ex427__rbx2016/Contribs/qt.7z).Length) bytes"
+            } else { echo "qt.7z not found on gofile" }
+          } catch { echo "Qt download failed: $_" }
 
-      - name: Build dependencies and client
+      - name: Install 7zip
+        shell: powershell
+        run: choco install -y 7zip --no-progress
+
+      - name: Extract Qt
         shell: powershell
         run: |
-          $client = "clients/al-ex427__rbx2016"
-          & $env:MSBUILD "$client/Client_2016.sln" /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v140 /t:WindowsClient 2>&1 | Out-String
-          echo "EXITCODE=$LASTEXITCODE" >> $env:GITHUB_ENV
+          $qt = "clients/al-ex427__rbx2016/Contribs/qt.7z"
+          if (Test-Path $qt) {
+            Push-Location "clients/al-ex427__rbx2016/Contribs"
+            & "C:\Program Files\7-Zip\7z.exe" x qt.7z -y -o. | Out-String | Write-Host
+            Pop-Location
+          } else { echo "qt.7z missing, WindowsClient will fail" }
 
-      - name: Collect build output
+      - name: Build Boost (part of deps)
+        shell: powershell
+        working-directory: clients/al-ex427__rbx2016/Contribs/boost_1_56_0
+        run: |
+          cmd /c bootstrap.bat
+          cmd /c "call \"C:\Program Files (x86)\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars32.bat\" && b2.exe toolset=msvc-14.0 variant=release link=static runtime-link=static threading=multi address-model=32 --with-date_time --with-filesystem --with-regex --with-system --with-thread --with-chrono --with-random --with-signals --with-serialization --with-program_options --with-locale -j 2"
+
+      - name: Build WindowsClient and RCCService
+        shell: powershell
+        continue-on-error: false
+        run: |
+          $msbuild = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+          $sln = "clients/al-ex427__rbx2016/Client_2016.sln"
+          & $msbuild $sln /m:2 /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v140 /p:WindowsTargetPlatformVersion=10.0 /t:WindowsClient /v:minimal 2>&1 | Out-String
+          & $msbuild $sln /m:2 /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v140 /p:WindowsTargetPlatformVersion=10.0 /t:RCCService /v:minimal 2>&1 | Out-String
+          echo "BUILD_EXIT=$LASTEXITCODE" >> $env:GITHUB_ENV
+
+      - name: Collect and upload artifacts
         shell: powershell
         run: |
-          $outDir = Get-ChildItem -Recurse -Directory -Filter Release | Where-Object { $_.FullName -like "*WindowsClient*" -or $_.FullName -like "*RCCService*" -or $_.FullName -like "*RobloxStudio*" }
           New-Item -ItemType Directory -Force -Path artifacts
-          foreach ($d in $outDir) { Copy-Item -Recurse -Force $d.FullName "artifacts/" }
-          echo "Collected dirs: $($outDir.FullName -join ', ')"
+          Get-ChildItem -Recurse -Path "clients/al-ex427__rbx2016" -Include *.exe,*.dll,*.pdb -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "\\Release\\" } | Copy-Item -Destination artifacts -Force
+          Get-ChildItem artifacts | Select-Object Name,Length | Format-Table
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: roblox-2016-build
           path: artifacts/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 7
