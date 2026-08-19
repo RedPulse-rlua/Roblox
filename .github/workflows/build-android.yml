@@ -49,6 +49,9 @@ jobs:
           SET="$(pwd)/clients/al-ex427__rbx2016"
           NDK="$(pwd)/ndk/android-ndk-r17c"
           STL="$NDK/sources/cxx-stl"
+          echo "=== DIAG asm dir ==="
+          ls -la "$SET/Contribs/android/asm/" || echo NO_ASM_DIR
+          ls -la "$SET/Contribs/android/asm/page.h" 2>/dev/null || echo NO_PAGE_H
           for abi in armeabi-v7a x86; do
             rm -rf "$SET/Android/build/release/$abi"
             cmake -S "$SET" -B "$SET/Android/build/release/$abi" -G Ninja \
