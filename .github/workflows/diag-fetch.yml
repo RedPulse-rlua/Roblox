@@ -1,0 +1,25 @@
+name: diag-fetch
+on:
+  workflow_dispatch:
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Tarball probe
+        run: |
+          DP="Contribs/boost_1_56_0/include/boost/preprocessor/debug"
+          curl -fsSL "https://codeload.github.com/al-ex427/rbx2016/tar.gz/refs/heads/main" -o /tmp/a.tar.gz
+          ls -la /tmp/a.tar.gz
+          echo "--- tar listing grep debug ---"
+          tar -tzf /tmp/a.tar.gz | grep -c "/$DP" || true
+          tar -tzf /tmp/a.tar.gz | grep "$DP" | head || true
+          echo "--- extract probe ---"
+          rm -rf /tmp/x && mkdir -p /tmp/x
+          tar -xzf /tmp/a.tar.gz --strip-components=1 -C /tmp/x --wildcards "*$DP*" || true
+          ls -la /tmp/x/Contribs/boost_1_56_0/include/boost/preprocessor/debug/ 2>/dev/null || echo "NO DEBUG DIR IN TARBALL"
+      - name: Git clone probe
+        run: |
+          git clone --depth 1 --quiet "https://github.com/al-ex427/rbx2016.git" /tmp/c
+          ls -la /tmp/c/Contribs/boost_1_56_0/include/boost/preprocessor/debug/ 2>/dev/null || echo "NO DEBUG DIR IN CLONE"
+          wc -l /tmp/c/.gitmodules 2>/dev/null || echo "no .gitmodules"
