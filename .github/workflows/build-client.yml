@@ -19,15 +19,18 @@ jobs:
       - name: Install v140 toolset into VS2022
         shell: powershell
         run: |
-          $args = @('modify','--installPath','C:\Program Files\Microsoft Visual Studio\2022\Enterprise','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--quiet','--norestart','--wait','--nocache')
-          $p = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList $args -Wait -PassThru -NoNewWindow
-          Write-Host "setup.exe exit: $($p.ExitCode), v140 dir exists: $(Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')"
-          if (-not (Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')) {
-            Write-Host "Falling back to VS2019 BuildTools bootstrapper"
+          $v140dir = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140'
+          $p = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList @('modify','--installPath','C:\Program Files\Microsoft Visual Studio\2022\Enterprise','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--quiet','--norestart','--nocache') -Wait -PassThru -NoNewWindow
+          Write-Host "setup.exe exit: $($p.ExitCode), v140 exists: $(Test-Path $v140dir)"
+          if (-not (Test-Path $v140dir)) {
+            Write-Host "Fallback: VS2019 BuildTools bootstrapper"
             Invoke-WebRequest -Uri "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile "$env:TEMP\vs_buildtools.exe" -UseBasicParsing
-            Start-Process "$env:TEMP\vs_buildtools.exe" -ArgumentList '--quiet','--wait','--norestart','--nocache','--add','Microsoft.VisualStudio.Workload.VCTools','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--includeRecommended' -Wait -PassThru -NoNewWindow
-            Write-Host "BT v140 dir exists: $(Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v140')"
+            $b = Start-Process "$env:TEMP\vs_buildtools.exe" -ArgumentList @('--quiet','--wait','--norestart','--nocache','--add','Microsoft.VisualStudio.Workload.VCTools','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--includeRecommended') -Wait -PassThru -NoNewWindow
+            Write-Host "vs_buildtools exit: $($b.ExitCode)"
+            $v140dir = 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v140'
+            Write-Host "v140 exists (2019 BT): $(Test-Path $v140dir)"
           }
+          if (-not (Test-Path $v140dir)) { throw "v140 toolset could not be installed" }
 
       - name: Build RCCService (Release, Win32, v140)
         shell: powershell
@@ -46,7 +49,7 @@ jobs:
         shell: powershell
         run: |
           New-Item -ItemType Directory -Force -Path artifacts
-          Get-ChildItem -Recurse -Path "clients/al-ex427__rbx2016" -Include *.exe,*.dll,*.pdb -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "\\Release\\|\\Debug\\" } | ForEach-Object { Copy-Item -Destination artifacts -Force }
+          Get-ChildItem -Recurse -Path "clients/al-ex427__rbx2016" -Include *.exe,*.dll,*.pdb -File -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match "\\Release\\|\\Debug\\" } | ForEach-Object { Copy-Item -Path $_.FullName -Destination artifacts -Force }
           Get-ChildItem artifacts -ErrorAction SilentlyContinue | Select-Object Name,Length | Format-Table
 
       - name: Upload artifacts
