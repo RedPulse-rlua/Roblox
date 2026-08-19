@@ -40,9 +40,10 @@ jobs:
       - name: Build libroblox.so (armeabi-v7a, x86)
         run: |
           SET="clients/al-ex427__rbx2016"
-          NDK="$SET/cmake/Toolchains/android-ndk-r17c"
+          NDK="$(pwd)/$SET/cmake/Toolchains/android-ndk-r17c"
           STL="$NDK/sources/cxx-stl"
           for abi in armeabi-v7a x86; do
+            rm -rf "$SET/Android/build/release/$abi"
             cmake -S "$SET" -B "$SET/Android/build/release/$abi" -G Ninja \
               -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
               -DANDROID_NDK="$NDK" \
