@@ -19,30 +19,42 @@ jobs:
       - name: Install v140 toolset into VS2022
         shell: powershell
         run: |
-          $v140dir = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140'
           $p = Start-Process -FilePath "C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe" -ArgumentList @('modify','--installPath','C:\Program Files\Microsoft Visual Studio\2022\Enterprise','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--quiet','--norestart','--nocache') -Wait -PassThru -NoNewWindow
-          Write-Host "setup.exe exit: $($p.ExitCode), v140 exists: $(Test-Path $v140dir)"
-          if (-not (Test-Path $v140dir)) {
+          Write-Host "setup.exe exit: $($p.ExitCode)"
+          if (-not (Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')) {
             Write-Host "Fallback: VS2019 BuildTools bootstrapper"
             Invoke-WebRequest -Uri "https://aka.ms/vs/16/release/vs_buildtools.exe" -OutFile "$env:TEMP\vs_buildtools.exe" -UseBasicParsing
             $b = Start-Process "$env:TEMP\vs_buildtools.exe" -ArgumentList @('--quiet','--wait','--norestart','--nocache','--add','Microsoft.VisualStudio.Workload.VCTools','--add','Microsoft.VisualStudio.Component.VC.v140.x86.x64','--includeRecommended') -Wait -PassThru -NoNewWindow
             Write-Host "vs_buildtools exit: $($b.ExitCode)"
-            $v140dir = 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v140'
-            Write-Host "v140 exists (2019 BT): $(Test-Path $v140dir)"
           }
-          if (-not (Test-Path $v140dir)) { throw "v140 toolset could not be installed" }
+          Write-Host "=== VC layout ==="
+          Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC' -ErrorAction SilentlyContinue | Select-Object Name | Format-Table
+          Get-ChildItem 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC' -ErrorAction SilentlyContinue | Select-Object Name | Format-Table
+
+      - name: Probe toolset with tiny project
+        shell: powershell
+        run: |
+          New-Item -ItemType Directory -Force -Path probe
+          $msb2022 = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+          $msb2019 = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
+          Set-Content -Path probe/main.cpp -Value "int main(){return 0;}"
+          $toolset = if (Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140') { "v140"; $global:MSB = $msb2022 } elseif (Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Microsoft\VC\v140') { "v140"; $global:MSB = $msb2019 } else { "v143"; $global:MSB = $msb2022 }
+          $proj = "<?xml version=`"1.0`" encoding=`"utf-8`"?><Project ToolsVersion=`"4.0`" xmlns=`"http://schemas.microsoft.com/developer/msbuild/2003`"><ItemGroup Label=`"ProjectConfigurations`"><ProjectConfiguration Include=`"Release|Win32`"><Configuration>Release</Configuration><Platform>Win32</Platform></ProjectConfiguration></ItemGroup><PropertyGroup Label=`"Globals`"/><Import Project=`"`$(VCTargetsPath)\Microsoft.Cpp.Default.props`"/><PropertyGroup Label=`"Configuration`"><ConfigurationType>Application</ConfigurationType><PlatformToolset>$toolset</PlatformToolset></PropertyGroup><Import Project=`"`$(VCTargetsPath)\Microsoft.Cpp.props`"/><ItemGroup><ClCompile Include=`"main.cpp`"/></ItemGroup><Import Project=`"`$(VCTargetsPath)\Microsoft.Cpp.targets`"/></Project>"
+          Set-Content -Path probe/probe.vcxproj -Value $proj
+          & $global:MSB probe\probe.vcxproj /p:Configuration=Release /p:Platform=Win32 /v:minimal 2>&1 | Out-String | Write-Host
+          $ok = Test-Path "probe\Release\probe.exe"
+          Write-Host "PROBE_TOOLSET=$toolset PROBE_OK=$ok"
+          if ($ok) { echo "TOOLSET=$toolset" >> $env:GITHUB_ENV; echo "MSB=$($global:MSB)" >> $env:GITHUB_ENV }
 
       - name: Build RCCService (Release, Win32, v140)
         shell: powershell
         continue-on-error: true
         run: |
-          $msbuild = "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
-          if (-not (Test-Path 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Microsoft\VC\v140')) {
-            $msbuild = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe"
-          }
-          Write-Host "Using MSBuild: $msbuild"
+          $msbuild = if ($env:MSB) { $env:MSB } else { "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe" }
+          $toolset = if ($env:TOOLSET) { $env:TOOLSET } else { "v143" }
+          Write-Host "Using MSBuild: $msbuild with toolset $toolset"
           $sln = "clients/al-ex427__rbx2016/Client_2016.sln"
-          & $msbuild $sln /m:2 /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v140 /p:WindowsTargetPlatformVersion=10.0 /t:RCCService /v:minimal 2>&1 | Tee-Object -FilePath build_output.log
+          & $msbuild $sln /m:2 /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=$toolset /p:WindowsTargetPlatformVersion=10.0 /t:RCCService /v:minimal 2>&1 | Tee-Object -FilePath build_output.log
           Write-Host "RCCService build exit: $LASTEXITCODE"
 
       - name: Collect build output
