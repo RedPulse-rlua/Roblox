@@ -1,0 +1,78 @@
+name: build-android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-android.yml']
+
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      CLIENT: clients/al-ex427__rbx2016
+      ANDROID_HOME: /usr/local/lib/android/sdk
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install ninja and SDK packages
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ninja-build
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          echo "y" | "$SDKM" --install "platforms;android-28" "build-tools;34.0.0" > /dev/null
+
+      - name: Place FMOD .so into fmod/Android tree
+        run: |
+          SRC="clients/al-ex427__rbx2016/Android/NativeShell/build/intermediates/merged_native_libs/standardRelease/mergeStandardReleaseNativeLibs/out/lib"
+          for abi in armeabi-v7a x86; do
+            mkdir -p "clients/al-ex427__rbx2016/fmod/Android/$abi"
+            cp "$SRC/$abi/libfmod.so" "clients/al-ex427__rbx2016/fmod/Android/$abi/"
+            ls -la "clients/al-ex427__rbx2016/fmod/Android/$abi/"
+          done
+
+      - name: Build libroblox.so (armeabi-v7a, x86)
+        run: |
+          SET="clients/al-ex427__rbx2016"
+          NDK="$SET/cmake/Toolchains/android-ndk-r17c"
+          STL="$NDK/sources/cxx-stl"
+          for abi in armeabi-v7a x86; do
+            cmake -S "$SET" -B "$SET/Android/build/release/$abi" -G Ninja \
+              -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
+              -DANDROID_NDK="$NDK" \
+              -DANDROID_ABI="$abi" \
+              -DANDROID_PLATFORM=android-21 \
+              -DANDROID_STL=c++_static \
+              -DANDROID_ARM_NEON=OFF \
+              -DRBX_STL_INCLUDE_DIRS="$STL/llvm-libc++/include;$STL/llvm-libc++abi/include;$STL/../../sources/android/support/include" \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCONTRIB_PATH="$SET/Contribs"
+            cmake --build "$SET/Android/build/release/$abi" -- -j$(nproc)
+            ls -la "$SET/Android/build/release/$abi/libroblox.so"
+          done
+
+      - name: Assemble Release APK
+        run: |
+          ROOT="$(pwd)"
+          cd clients/al-ex427__rbx2016/Android
+          ./gradlew :NativeShell:assembleRelease \
+            --project-prop android.useAndroidX=false \
+            --project-prop android.enableJetifier=false \
+            --gradle-user-home "$ROOT/.gradle-cache" \
+            --console=plain
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roblox2016-android
+          path: |
+            clients/al-ex427__rbx2016/Android/NativeShell/build/outputs/apk/*/*.apk
+            clients/al-ex427__rbx2016/Android/build/release/*/libroblox.so
+          if-no-files-found: error
