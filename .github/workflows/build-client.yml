@@ -1,0 +1,56 @@
+name: Build Roblox 2016 Client
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Configure git long paths
+        run: git config --system core.longpaths true
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore client sources
+        run: bash scripts/fetch-clients.sh
+
+      - name: Install build tools
+        shell: powershell
+        run: |
+          choco install -y visualstudio2019buildtools visualstudio2015buildtools --no-progress
+          choco install -y python3 --no-progress
+
+      - name: Add VS tools to PATH
+        shell: powershell
+        run: |
+          $vs = "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools"
+          $msbuild = Join-Path $vs "MSBuild\Current\Bin\MSBuild.exe"
+          echo "MSBUILD=$msbuild" >> $env:GITHUB_ENV
+
+      - name: Build dependencies and client
+        shell: powershell
+        run: |
+          $client = "clients/al-ex427__rbx2016"
+          & $env:MSBUILD "$client/Client_2016.sln" /m /p:Configuration=Release /p:Platform=Win32 /p:PlatformToolset=v140 /t:WindowsClient 2>&1 | Out-String
+          echo "EXITCODE=$LASTEXITCODE" >> $env:GITHUB_ENV
+
+      - name: Collect build output
+        shell: powershell
+        run: |
+          $outDir = Get-ChildItem -Recurse -Directory -Filter Release | Where-Object { $_.FullName -like "*WindowsClient*" -or $_.FullName -like "*RCCService*" -or $_.FullName -like "*RobloxStudio*" }
+          New-Item -ItemType Directory -Force -Path artifacts
+          foreach ($d in $outDir) { Copy-Item -Recurse -Force $d.FullName "artifacts/" }
+          echo "Collected dirs: $($outDir.FullName -join ', ')"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: roblox-2016-build
+          path: artifacts/
+          if-no-files-found: error
+          retention-days: 7
