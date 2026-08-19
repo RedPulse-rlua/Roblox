@@ -37,14 +37,21 @@ jobs:
             ls -la "clients/al-ex427__rbx2016/fmod/Android/$abi/"
           done
 
+      - name: Download Android NDK r17c (linux)
+        run: |
+          curl -fsSL -o ndk.zip https://dl.google.com/android/repository/android-ndk-r17c-linux-x86_64.zip
+          unzip -q ndk.zip -d ndk
+          ls ndk
+
       - name: Build libroblox.so (armeabi-v7a, x86)
         run: |
           SET="clients/al-ex427__rbx2016"
-          NDK="$(pwd)/$SET/cmake/Toolchains/android-ndk-r17c"
+          NDK="$(pwd)/ndk/android-ndk-r17c"
           STL="$NDK/sources/cxx-stl"
           for abi in armeabi-v7a x86; do
             rm -rf "$SET/Android/build/release/$abi"
             cmake -S "$SET" -B "$SET/Android/build/release/$abi" -G Ninja \
+              -DCMAKE_MAKE_PROGRAM="$(command -v ninja)" \
               -DCMAKE_TOOLCHAIN_FILE="$NDK/build/cmake/android.toolchain.cmake" \
               -DANDROID_NDK="$NDK" \
               -DANDROID_ABI="$abi" \
