@@ -4,7 +4,6 @@
 #include <windows.h>
 #elif __ANDROID__
 #else
-#else
 #include <libkern/OSAtomic.h>
 #endif
 
