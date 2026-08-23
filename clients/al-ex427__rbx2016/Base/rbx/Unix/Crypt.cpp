@@ -1,5 +1,5 @@
 #include "rbx/Crypt.h"
-#include "RbxFormat.h"
+#include "rbxFormat.h"
 #include <boost/scoped_array.hpp>
 
 #include <iostream>
@@ -126,11 +126,10 @@ namespace RBX
 	}
 		
 	//Crypt implementation with RSA security using SHA1 algorithm for signature verification.
-	bool Crypt::verifySignatureBase64(std::string messageStr, std::string signatureStr)
+	void Crypt::verifySignatureBase64(std::string messageStr, std::string signatureStr)
 	{
 		if (!verifyMessage((char*)messageStr.c_str(), (char*)signatureStr.c_str()))
 			throw std::runtime_error("");  // message hidden on purpose - prevent reverse engineering
-		return true;
 	}
 			
 } // namespace RBX

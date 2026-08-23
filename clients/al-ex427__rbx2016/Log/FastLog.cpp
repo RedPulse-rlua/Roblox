@@ -3,6 +3,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #elif __ANDROID__
+#include <sys/atomics.h>
 #else
 #include <libkern/OSAtomic.h>
 #endif
